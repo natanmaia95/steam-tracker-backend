@@ -4,6 +4,57 @@ import cors from 'cors';
 import fetch from 'node-fetch'; // For making HTTP requests in Node.js
 import 'dotenv/config'; // Loads .env file (for PORT and ALLOWED_ORIGINS)
 
+
+
+
+let queryCache = {
+  //ownedgames keys are account ids.
+  "ownedgames": {} 
+};
+
+const getFromCache = function(category, key) {
+  let cachedCategory = queryCache[category];
+  if (!cachedCategory) return null;
+  
+  let cachedQuery = cachedCategory[key];
+  if (!cachedQuery || !cachedQuery.data) return null;
+
+  return {
+    ...cachedQuery.data,
+    "_from_cache": true
+  };
+};
+
+const putInCache = function(category, key, data, override=false) {
+  let cachedCategory = queryCache[category];
+  if (!cachedCategory) return;
+  
+  let existingQuery = cachedCategory[key];
+  if (existingQuery & !override) return;
+
+  let cacheEntry = {
+    data: data,
+    created: Date.now()
+  }
+
+  cachedCategory[key] = cacheEntry;
+  return;
+};
+
+const cleanCache = function() {
+  console.log("cleaning cache...");
+  for (const category of Object.keys(queryCache)) {
+    for (const key of Object.keys(category)) {
+      delete category[key];
+      console.log(`Cache for key '${key}' in category ${category} was cleaned.`);
+    }
+  }
+  console.log("finished cache cleaning.");
+};
+
+const cleanCacheIntervalId = setInterval(cleanCache, 1000*60*60*4) //clean every 4 hours
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -36,7 +87,7 @@ app.use(express.json());
 // Define the endpoint for proxying Steam's GetOwnedGames API
 // Your Angular app will call: GET https://steamtracker.yourdomain.com/steam-proxy/ownedgames?apiKey=...&accountId=...
 app.get('/steam-proxy/ownedgames', async (req, res) => {
-  const steamApiKey = req.query.apiKey; // Get apiKey from query parameters
+  const steamApiKey = process.env.API_KEY; // Get apiKey from query parameters
   const steamAccountId = req.query.accountId; // Get accountId from query parameters
 
   // Additional parameters you might want to forward to Steam API
@@ -46,6 +97,12 @@ app.get('/steam-proxy/ownedgames', async (req, res) => {
 
   if (!steamApiKey || !steamAccountId) {
     return res.status(400).json({ message: "Missing API key or Steam ID in request." });
+  }
+
+  // check cache first, if exists return
+  let cachedResult = getFromCache("ownedgames", steamAccountId);
+  if (cachedResult) {
+    return res.status(200).json(cachedResult.data); // Send the successful JSON data back to the Angular app
   }
 
   const steamUrl = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/` +
@@ -68,6 +125,12 @@ app.get('/steam-proxy/ownedgames', async (req, res) => {
     }
 
     const data = await steamResponse.json();
+
+    // Cache only if it's valid data (has a games array)
+    if (data.games && data.game_count) {
+      putInCache("ownedgames", steamAccountId, data);
+    }
+    
     return res.status(200).json(data); // Send the successful JSON data back to the Angular app
   } catch (error) {
     console.error("Error fetching from Steam API:", error);

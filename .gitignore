@@ -56,7 +56,7 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-.env # <--- Also good to have this for your backend .env file!
+.env
 .env*.local
 
 # parcel-bundler cache (https://parceljs.org/)
