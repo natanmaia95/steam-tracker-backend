@@ -32,7 +32,7 @@ coverage
 bower_components
 
 # node.js dependencies
-node_modules/  <-- MAKE SURE THIS LINE IS PRESENT
+node_modules/ 
 jspm_packages/
 
 # TypeScript v1 compilation
