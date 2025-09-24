@@ -95,8 +95,11 @@ app.get('/steam-proxy/ownedgames', async (req, res) => {
   const includePlayedFreeGames = req.query.include_played_free_games || 'true'; // Default to true
   const format = req.query.format || 'json'; // Default to json
 
-  if (!steamApiKey || !steamAccountId) {
-    return res.status(400).json({ message: "Missing API key or Steam ID in request." });
+  if (!steamApiKey) {
+    return res.status(400).json({ message: "Missing API key in request." });
+  }
+  if (!steamAccountId) {
+    return res.status(400).json({ message: "Steam ID in request." });
   }
 
   // check cache first, if exists return
